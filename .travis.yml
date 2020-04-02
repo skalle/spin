@@ -1,3 +1,0 @@
-language: go
-install: ./travisInstall.sh
-script: ./travisBuild.sh

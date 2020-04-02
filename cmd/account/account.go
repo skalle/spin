@@ -1,4 +1,4 @@
-// Copyright (c) 2018, Google, Inc.
+// Copyright 2019 New Relic Corporation. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,23 +12,35 @@
 //   See the License for the specific language governing permissions and
 //   limitations under the License.
 
-package oauth2
+package account
 
 import (
-	"golang.org/x/oauth2"
+	"io"
+
+	"github.com/spf13/cobra"
 )
 
-// Config is the configuration for using OAuth2.0 to
-// authenticate with Spinnaker
-type Config struct {
-	TokenUrl     string        `yaml:"tokenUrl"`
-	AuthUrl      string        `yaml:"authUrl"`
-	ClientId     string        `yaml:"clientId"`
-	ClientSecret string        `yaml:"clientSecret"`
-	Scopes       []string      `yaml:"scopes"`
-	CachedToken  *oauth2.Token `yaml:"cachedToken,omitempty"`
+type accountOptions struct {
 }
 
-func (x *Config) IsValid() bool {
-	return x.TokenUrl != "" && x.AuthUrl != "" && len(x.Scopes) != 0
+var (
+	accountShort   = ""
+	accountLong    = ""
+	accountExample = ""
+)
+
+func NewAccountCmd(out io.Writer) *cobra.Command {
+	options := accountOptions{}
+	cmd := &cobra.Command{
+		Use:     "account",
+		Aliases: []string{"account", "acc"},
+		Short:   accountShort,
+		Long:    accountLong,
+		Example: accountExample,
+	}
+
+	// create subcommands
+	cmd.AddCommand(NewGetCmd(options))
+	cmd.AddCommand(NewListCmd(options))
+	return cmd
 }

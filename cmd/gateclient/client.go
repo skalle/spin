@@ -29,8 +29,6 @@ import (
 	_ "net/http/pprof"
 	"net/url"
 	"os"
-	"os/user"
-	"path/filepath"
 	"strings"
 	"syscall"
 
@@ -38,8 +36,6 @@ import (
 	iap "github.com/spinnaker/spin/config/auth/iap"
 	"github.com/spinnaker/spin/util"
 	"github.com/spinnaker/spin/version"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 
 	"github.com/mitchellh/go-homedir"
 	"github.com/spf13/pflag"
@@ -179,7 +175,7 @@ func NewGateClient(flags *pflag.FlagSet) (*GatewayClient, error) {
 
 func userConfig(flags *pflag.FlagSet, gateClient *GatewayClient) error {
 	var err error
-	if gateClient.configLocation, err = ResolveConfig(flags); err != nil {
+	if gateClient.configLocation, err = config.Resolve(flags); err != nil {
 		return err
 	}
 
@@ -194,34 +190,6 @@ func userConfig(flags *pflag.FlagSet, gateClient *GatewayClient) error {
 		gateClient.Config = config.Config{}
 	}
 	return nil
-}
-
-func ResolveConfig(flags *pflag.FlagSet) (string, error) {
-	flag, err := flags.GetString("config")
-	if err != nil {
-		return "", err
-	}
-	if flag != "" {
-		return flag, nil
-	}
-	home, err := findHome()
-	if err != nil {
-		return "", err
-	}
-
-	return filepath.Join(home, ".spin", "config"), nil
-}
-
-func findHome() (string, error) {
-	if usr, err := user.Current(); err == nil {
-		return usr.HomeDir, nil
-	}
-	// Could not get current user.
-	home := os.Getenv("HOME")
-	if home == "" {
-		return "", status.Errorf(codes.NotFound, "current user not found")
-	}
-	return home, nil
 }
 
 func createClient(flags *pflag.FlagSet) (*GatewayClient, error) {

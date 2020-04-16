@@ -32,12 +32,14 @@ import (
 	"os/user"
 	"path/filepath"
 	"strings"
-  "syscall"
+	"syscall"
 
 	"github.com/spinnaker/spin/config"
 	iap "github.com/spinnaker/spin/config/auth/iap"
 	"github.com/spinnaker/spin/util"
 	"github.com/spinnaker/spin/version"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 
 	"github.com/mitchellh/go-homedir"
 	"github.com/spf13/pflag"
@@ -176,28 +178,9 @@ func NewGateClient(flags *pflag.FlagSet) (*GatewayClient, error) {
 }
 
 func userConfig(flags *pflag.FlagSet, gateClient *GatewayClient) error {
-	configLocationFlag, err := flags.GetString("config")
-	if err != nil {
+	var err error
+	if gateClient.configLocation, err = ResolveConfig(flags); err != nil {
 		return err
-	}
-	if configLocationFlag != "" {
-		gateClient.configLocation = configLocationFlag
-	} else {
-		userHome := ""
-		usr, err := user.Current()
-		if err != nil {
-			// Fallback by trying to read $HOME
-			userHome = os.Getenv("HOME")
-			if userHome != "" {
-				err = nil
-			} else {
-				util.UI.Error("Could not read current user from environment, failing.")
-				return err
-			}
-		} else {
-			userHome = usr.HomeDir
-		}
-		gateClient.configLocation = filepath.Join(userHome, ".spin", "config")
 	}
 
 	yamlFile, err := ioutil.ReadFile(gateClient.configLocation)
@@ -211,6 +194,34 @@ func userConfig(flags *pflag.FlagSet, gateClient *GatewayClient) error {
 		gateClient.Config = config.Config{}
 	}
 	return nil
+}
+
+func ResolveConfig(flags *pflag.FlagSet) (string, error) {
+	flag, err := flags.GetString("config")
+	if err != nil {
+		return "", err
+	}
+	if flag != "" {
+		return flag, nil
+	}
+	home, err := findHome()
+	if err != nil {
+		return "", err
+	}
+
+	return filepath.Join(home, ".spin", "config"), nil
+}
+
+func findHome() (string, error) {
+	if usr, err := user.Current(); err == nil {
+		return usr.HomeDir, nil
+	}
+	// Could not get current user.
+	home := os.Getenv("HOME")
+	if home == "" {
+		return "", status.Errorf(codes.NotFound, "current user not found")
+	}
+	return home, nil
 }
 
 func createClient(flags *pflag.FlagSet) (*GatewayClient, error) {
@@ -470,14 +481,13 @@ func (m *GatewayClient) login(accessToken string) error {
 func (m *GatewayClient) authenticateLdap() error {
 	auth := m.Config.Auth
 	if auth != nil && auth.Enabled && auth.Ldap != nil {
-    if auth.Ldap.Username == "" {
-      auth.Ldap.Username = prompt("Username:")
-    }
+		if auth.Ldap.Username == "" {
+			auth.Ldap.Username = prompt("Username:")
+		}
 
-    if auth.Ldap.Password == "" {
-      auth.Ldap.Password = securePrompt("Password:")
-    }
-
+		if auth.Ldap.Password == "" {
+			auth.Ldap.Password = securePrompt("Password:")
+		}
 
 		if !auth.Ldap.IsValid() {
 			return errors.New("Incorrect LDAP auth configuration. Must include username and password.")
@@ -560,7 +570,7 @@ func prompt(inputMsg string) string {
 
 func securePrompt(inputMsg string) string {
 	util.UI.Output(inputMsg)
-  byteSecret, _ := terminal.ReadPassword(int(syscall.Stdin))
-  secret := string(byteSecret)
+	byteSecret, _ := terminal.ReadPassword(int(syscall.Stdin))
+	secret := string(byteSecret)
 	return strings.TrimSpace(secret)
 }

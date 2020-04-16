@@ -20,6 +20,7 @@ func NewVerifyCmd(options configOptions) *cobra.Command {
 	//	configOptions: &options,
 	//}
 	cmd := &cobra.Command{
+		Use:     "verify",
 		Aliases: []string{"verify", "ve"},
 		Short:   verifyConfigShort,
 		Long:    verifyConfigLong,

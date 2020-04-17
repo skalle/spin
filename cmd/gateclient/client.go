@@ -36,6 +36,8 @@ import (
 	iap "github.com/spinnaker/spin/config/auth/iap"
 	"github.com/spinnaker/spin/util"
 	"github.com/spinnaker/spin/version"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 
 	"github.com/mitchellh/go-homedir"
 	"github.com/spf13/pflag"
@@ -176,19 +178,17 @@ func NewGateClient(flags *pflag.FlagSet) (*GatewayClient, error) {
 func userConfig(flags *pflag.FlagSet, gateClient *GatewayClient) error {
 	var err error
 	if gateClient.configLocation, gateClient.Config, err = config.LoadConfig(flags); err != nil {
+		// The file was not found we set the default location and an empty config.
+		if status.Code(err) == codes.NotFound {
+			if gateClient.configLocation, err = config.DefaultConfig(); err != nil {
+				return err
+			}
+			gateClient.Config = config.Config{}
+			return nil
+		}
 		return err
 	}
 
-	yamlFile, err := ioutil.ReadFile(gateClient.configLocation)
-	if yamlFile != nil {
-		err = yaml.UnmarshalStrict([]byte(os.ExpandEnv(string(yamlFile))), &gateClient.Config)
-		if err != nil {
-			util.UI.Error(fmt.Sprintf("Could not deserialize config file with contents: %s, failing.", yamlFile))
-			return err
-		}
-	} else {
-		gateClient.Config = config.Config{}
-	}
 	return nil
 }
 

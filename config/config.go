@@ -28,6 +28,11 @@ import (
 	"honnef.co/go/tools/config"
 )
 
+const (
+	DefaultDirectory = ".spin"
+	DefaultFile      = "config"
+)
+
 // Config is the CLI configuration kept in '~/.spin/config'.
 type Config struct {
 	Gate struct {
@@ -37,20 +42,28 @@ type Config struct {
 }
 
 // LoadConfig finds and loads the configuration.
-func LoadConfig(flags *pflag.FlagSet) (*config.Config, error) {
+func LoadConfig(flags *pflag.FlagSet) (string, *config.Config, error) {
 	cfgName, err := Resolve(flags)
 	if err != nil {
-		return nil, err
+		return "", nil, err
 	}
 	cfg, err := unmarshal(cfgName)
 	if err != nil {
 		if err == os.ErrNotExist {
-			return nil, status.Errorf(codes.NotFound, "file: %q not found", cfgName)
+			return "", nil, status.Errorf(codes.NotFound, "file: %q not found", cfgName)
 		}
-		return nil, err
+		return "", nil, err
 	}
 
-	return cfg, nil
+	return cfgName, cfg, nil
+}
+
+func DefaultConfig() (string, error) {
+	home, err := findHome()
+	if err != nil {
+		return "", err
+	}
+	return filepath.Join(home, DefaultDirectory, DefaultFile), nil
 }
 
 // Resolves tries to figure out where the config resides.
@@ -62,12 +75,7 @@ func Resolve(flags *pflag.FlagSet) (string, error) {
 	if flag != "" {
 		return flag, nil
 	}
-	home, err := findHome()
-	if err != nil {
-		return "", err
-	}
-
-	return filepath.Join(home, ".spin", "config"), nil
+	return DefaultConfig()
 }
 
 func findHome() (string, error) {

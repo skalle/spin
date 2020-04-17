@@ -33,6 +33,7 @@ type Config struct {
 	Auth *auth.Config `yaml:"auth"`
 }
 
+// Resolves tries to figure out where the config resides.
 func Resolve(flags *pflag.FlagSet) (string, error) {
 	flag, err := flags.GetString("config")
 	if err != nil {

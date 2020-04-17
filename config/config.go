@@ -15,6 +15,7 @@
 package config
 
 import (
+	"io/ioutil"
 	"os"
 	"os/user"
 	"path/filepath"
@@ -23,6 +24,8 @@ import (
 	"github.com/spinnaker/spin/config/auth"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+	"gopkg.in/yaml.v2"
+	"honnef.co/go/tools/config"
 )
 
 // Config is the CLI configuration kept in '~/.spin/config'.
@@ -31,6 +34,23 @@ type Config struct {
 		Endpoint string `yaml:"endpoint"`
 	} `yaml:"gate"`
 	Auth *auth.Config `yaml:"auth"`
+}
+
+// LoadConfig finds and loads the configuration.
+func LoadConfig(flags *pflag.FlagSet) (*config.Config, error) {
+	cfgName, err := Resolve(flags)
+	if err != nil {
+		return nil, err
+	}
+	cfg, err := unmarshal(cfgName)
+	if err != nil {
+		if err == os.ErrNotExist {
+			return nil, status.Errorf(codes.NotFound, "file: %q not found", cfgName)
+		}
+		return nil, err
+	}
+
+	return cfg, nil
 }
 
 // Resolves tries to figure out where the config resides.
@@ -60,4 +80,16 @@ func findHome() (string, error) {
 		return "", status.Errorf(codes.NotFound, "current user not found")
 	}
 	return home, nil
+}
+
+func unmarshal(path string) (*config.Config, error) {
+	yamlFile, err := ioutil.ReadFile(path)
+	if err != nil {
+		return nil, err
+	}
+	var cfg config.Config
+	if err := yaml.UnmarshalStrict([]byte(os.ExpandEnv(string(yamlFile))), &cfg); err != nil {
+		return nil, err
+	}
+	return &cfg, nil
 }

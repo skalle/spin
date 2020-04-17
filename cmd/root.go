@@ -8,7 +8,6 @@ import (
 	"github.com/spinnaker/spin/cmd/account"
 	"github.com/spinnaker/spin/cmd/application"
 	"github.com/spinnaker/spin/cmd/canary"
-	"github.com/spinnaker/spin/cmd/config"
 	"github.com/spinnaker/spin/cmd/pipeline"
 	pipeline_template "github.com/spinnaker/spin/cmd/pipeline-template"
 	"github.com/spinnaker/spin/cmd/project"

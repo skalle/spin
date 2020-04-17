@@ -21,5 +21,6 @@ require (
 	google.golang.org/genproto v0.0.0-20190819201941-24fa4b261c55
 	google.golang.org/grpc v1.21.1
 	gopkg.in/yaml.v2 v2.2.2
+	honnef.co/go/tools v0.0.0-20190418001031-e561f6794a2a
 	k8s.io/client-go v11.0.0+incompatible
 )

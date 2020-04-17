@@ -25,7 +25,6 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"gopkg.in/yaml.v2"
-	"honnef.co/go/tools/config"
 )
 
 const (
@@ -42,20 +41,20 @@ type Config struct {
 }
 
 // LoadConfig finds and loads the configuration.
-func LoadConfig(flags *pflag.FlagSet) (string, *config.Config, error) {
+func LoadConfig(flags *pflag.FlagSet) (string, Config, error) {
 	cfgName, err := Resolve(flags)
 	if err != nil {
-		return "", nil, err
+		return "", Config{}, err
 	}
 	cfg, err := unmarshal(cfgName)
 	if err != nil {
 		if err == os.ErrNotExist {
-			return "", nil, status.Errorf(codes.NotFound, "file: %q not found", cfgName)
+			return "", Config{}, status.Errorf(codes.NotFound, "file: %q not found", cfgName)
 		}
-		return "", nil, err
+		return "", Config{}, err
 	}
 
-	return cfgName, cfg, nil
+	return cfgName, *cfg, nil
 }
 
 func DefaultConfig() (string, error) {
@@ -90,12 +89,12 @@ func findHome() (string, error) {
 	return home, nil
 }
 
-func unmarshal(path string) (*config.Config, error) {
+func unmarshal(path string) (*Config, error) {
 	yamlFile, err := ioutil.ReadFile(path)
 	if err != nil {
 		return nil, err
 	}
-	var cfg config.Config
+	var cfg Config
 	if err := yaml.UnmarshalStrict([]byte(os.ExpandEnv(string(yamlFile))), &cfg); err != nil {
 		return nil, err
 	}

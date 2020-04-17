@@ -175,7 +175,7 @@ func NewGateClient(flags *pflag.FlagSet) (*GatewayClient, error) {
 
 func userConfig(flags *pflag.FlagSet, gateClient *GatewayClient) error {
 	var err error
-	if gateClient.configLocation, err = config.Resolve(flags); err != nil {
+	if gateClient.configLocation, gateClient.Config, err = config.LoadConfig(flags); err != nil {
 		return err
 	}
 

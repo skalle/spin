@@ -2,7 +2,7 @@ package config
 
 import (
 	"github.com/spf13/cobra"
-	"github.com/spinnaker/spin/cmd/gateclient"
+	"github.com/spinnaker/spin/config"
 )
 
 type VerifyOptions struct {
@@ -34,11 +34,11 @@ func NewVerifyCmd(options configOptions) *cobra.Command {
 }
 
 func verifyConfig(cmd *cobra.Command, args []string) error {
-	_, err := gateclient.NewGateClient(cmd.InheritedFlags())
+	cfgPath, _, err := config.LoadConfig(cmd.InheritedFlags())
 	if err != nil {
-		cmd.Println("Verify failed")
 		return err
 	}
-	cmd.Println("Verified")
+	cmd.Println("ConfigPath:", cfgPath)
+	cmd.Println("Config Load: success")
 	return nil
 }

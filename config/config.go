@@ -57,6 +57,7 @@ func LoadConfig(flags *pflag.FlagSet) (string, Config, error) {
 	return cfgName, *cfg, nil
 }
 
+// DefaultConfig returns the default configuration path.
 func DefaultConfig() (string, error) {
 	home, err := findHome()
 	if err != nil {

@@ -2,11 +2,13 @@ package pipeline
 
 import (
 	"github.com/spf13/cobra"
-	"github.com/spinnaker/spin/cmd/pipeline/execution"
-	"io"
+
+	"github.com/spinnaker/spin/cmd"
 )
 
-type pipelineOptions struct{}
+type PipelineOptions struct {
+	*cmd.RootOptions
+}
 
 var (
 	pipelineShort   = ""
@@ -14,8 +16,10 @@ var (
 	pipelineExample = ""
 )
 
-func NewPipelineCmd(out io.Writer) *cobra.Command {
-	options := pipelineOptions{}
+func NewPipelineCmd(rootOptions *cmd.RootOptions) (*cobra.Command, *PipelineOptions) {
+	options := &PipelineOptions{
+		RootOptions: rootOptions,
+	}
 	cmd := &cobra.Command{
 		Use:     "pipeline",
 		Aliases: []string{"pipelines", "pi"},
@@ -30,6 +34,6 @@ func NewPipelineCmd(out io.Writer) *cobra.Command {
 	cmd.AddCommand(NewDeleteCmd(options))
 	cmd.AddCommand(NewSaveCmd(options))
 	cmd.AddCommand(NewExecuteCmd(options))
-	cmd.AddCommand(execution.NewExecutionCmd(out))
-	return cmd
+	cmd.AddCommand(NewUpdateCmd(options))
+	return cmd, options
 }

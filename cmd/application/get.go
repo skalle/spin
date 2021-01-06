@@ -16,14 +16,16 @@ package application
 
 import (
 	"fmt"
-	"github.com/spinnaker/spin/util"
 	"net/http"
 
+	"github.com/antihax/optional"
 	"github.com/spf13/cobra"
-	"github.com/spinnaker/spin/cmd/gateclient"
+
+	gate "github.com/spinnaker/spin/gateapi"
+	"github.com/spinnaker/spin/util"
 )
 
-type GetOptions struct {
+type getOptions struct {
 	*applicationOptions
 	expand bool
 }
@@ -34,10 +36,10 @@ var (
 	getApplicationExample = "usage: spin application get [options] application-name"
 )
 
-func NewGetCmd(appOptions applicationOptions) *cobra.Command {
-	options := GetOptions{
-		applicationOptions: &appOptions,
-		expand: false,
+func NewGetCmd(appOptions *applicationOptions) *cobra.Command {
+	options := &getOptions{
+		applicationOptions: appOptions,
+		expand:             false,
 	}
 
 	cmd := &cobra.Command{
@@ -46,7 +48,7 @@ func NewGetCmd(appOptions applicationOptions) *cobra.Command {
 		Short:   getApplicationShort,
 		Long:    getApplicationLong,
 		Example: getApplicationExample,
-		RunE:    func(cmd *cobra.Command, args []string) error {
+		RunE: func(cmd *cobra.Command, args []string) error {
 			return getApplication(cmd, options, args)
 		},
 	}
@@ -57,22 +59,20 @@ func NewGetCmd(appOptions applicationOptions) *cobra.Command {
 	return cmd
 }
 
-func getApplication(cmd *cobra.Command, options GetOptions, args []string) error {
-	gateClient, err := gateclient.NewGateClient(cmd.InheritedFlags())
-	if err != nil {
-		return err
-	}
-
+func getApplication(cmd *cobra.Command, options *getOptions, args []string) error {
 	applicationName, err := util.ReadArgsOrStdin(args)
 	if err != nil {
 		return err
 	}
 
-	app, resp, err := gateClient.ApplicationControllerApi.GetApplicationUsingGET(gateClient.Context, applicationName, map[string]interface{}{"expand": options.expand})
+	app, resp, err := options.GateClient.ApplicationControllerApi.GetApplicationUsingGET(options.GateClient.Context, applicationName, &gate.ApplicationControllerApiGetApplicationUsingGETOpts{Expand: optional.NewBool(options.expand)})
 	if resp != nil {
-		if resp.StatusCode == http.StatusNotFound {
+		switch resp.StatusCode {
+		case http.StatusOK:
+			// pass
+		case http.StatusNotFound:
 			return fmt.Errorf("Application '%s' not found\n", applicationName)
-		} else if resp.StatusCode != http.StatusOK {
+		default:
 			return fmt.Errorf("Encountered an error getting application, status code: %d\n", resp.StatusCode)
 		}
 	}
@@ -84,10 +84,10 @@ func getApplication(cmd *cobra.Command, options GetOptions, args []string) error
 	if options.expand {
 		// NOTE: expand returns the actual attributes as well as the app's cluster details, nested in
 		// their own fields. This means that the expanded output can't be submitted as input to `save`.
-		util.UI.JsonOutput(app, util.UI.OutputFormat)
+		options.Ui.JsonOutput(app)
 	} else {
 		// NOTE: app GET wraps the actual app attributes in an 'attributes' field.
-		util.UI.JsonOutput(app["attributes"], util.UI.OutputFormat)
+		options.Ui.JsonOutput(app["attributes"])
 	}
 
 	return nil

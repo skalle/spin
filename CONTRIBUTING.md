@@ -6,7 +6,7 @@ Interested in contributing to Spinnaker? Please review the [contribution documen
 
 ### Go
 
-[Install Go 1.13.x](https://golang.org/doc/install). 
+[Install Go 1.13.x](https://golang.org/doc/install).
 
 ### Go modules
 
@@ -50,10 +50,28 @@ from the root `spin/` directory.
 
 ## Updating the Gate API
 
-Spin CLI uses [Swagger](https://swagger.io/) to generate the API client library for [Gate](https://github.com/spinnaker/gate). To update the client library:
+Spin CLI uses [Swagger](https://swagger.io/) to generate the API client library for [Gate](https://github.com/spinnaker/gate).
 
-- From the root of the Gate directory, execute `swagger/generate_swagger.sh` to create the `swagger.json` API spec.
-- Get the [Swagger Codegen CLI](https://github.com/swagger-api/swagger-codegen). Use the version specified [here](https://github.com/spinnaker/spin/blob/master/gateapi/.swagger-codegen/VERSION).
-- Remove the existing generated code from the spin directory `rm -r ~/spin/gateapi`
-- Use the Swagger Codegen CLI to generate the new library and drop it into the spin project `java -jar ~/swagger-codegen-cli.jar generate -i ~/gate/swagger/swagger.json -l go -o ~/spin/gateapi`
+Spin CLI's `master` should be using Gate's `master` swagger definition. Similarly, each [spin release version](https://github.com/spinnaker/spin/tags) `version-{major}.{minor}.x` should match [Gate's tag](https://github.com/spinnaker/gate/tags) `version-{major}.{minor}`.
+
+Example:
+| Spin CLI version | Gate version   |
+| ---------------- | ------------   |
+| version-1.17.3   | version-1.17.0 |
+| version-1.17.2   | version-1.17.0 |
+| version-1.17.1   | version-1.17.0 |
+
+
+To update the client library:
+
+- Use the Swagger Codegen to generate the new library and drop it into the spin project
+    ```bash
+    GATE_REPO_PATH=PATH_TO_YOUR_GATE_REPO
+    SWAGGER_CODEGEN_VERSION=$(cat gateapi/.swagger-codegen/VERSION)
+    rm -rf gateapi/ \
+    && docker run -it \
+        -v "${GATE_REPO_PATH}/swagger/:/tmp/gate" \
+        -v "$PWD/gateapi/:/tmp/go/" \
+        "swaggerapi/swagger-codegen-cli:${SWAGGER_CODEGEN_VERSION}" generate -i /tmp/gate/swagger.json -l go -o /tmp/go/
+    ```
 - Commit the changes and open a PR.

@@ -17,14 +17,16 @@ package execution
 import (
 	"errors"
 	"fmt"
-	"github.com/spf13/cobra"
-	"github.com/spinnaker/spin/cmd/gateclient"
-	"github.com/spinnaker/spin/util"
 	"net/http"
 	"strings"
+
+	"github.com/antihax/optional"
+	"github.com/spf13/cobra"
+
+	gate "github.com/spinnaker/spin/gateapi"
 )
 
-type ListOptions struct {
+type listOptions struct {
 	*executionOptions
 	output           string
 	pipelineConfigId string
@@ -40,9 +42,9 @@ var (
 	listExecutionLong  = "List the executions for the provided pipeline id"
 )
 
-func NewListCmd(executionOptions executionOptions) *cobra.Command {
-	options := ListOptions{
-		executionOptions: &executionOptions,
+func NewListCmd(executionOptions *executionOptions) *cobra.Command {
+	options := &listOptions{
+		executionOptions: executionOptions,
 	}
 	cmd := &cobra.Command{
 		Use:     "list",
@@ -64,18 +66,13 @@ func NewListCmd(executionOptions executionOptions) *cobra.Command {
 	return cmd
 }
 
-func listExecution(cmd *cobra.Command, options ListOptions) error {
-	gateClient, err := gateclient.NewGateClient(cmd.InheritedFlags())
-	if err != nil {
-		return err
-	}
-
+func listExecution(cmd *cobra.Command, options *listOptions) error {
 	if options.pipelineConfigId == "" {
 		return errors.New("required parameter 'pipeline-id' not set")
 	}
 
-	query := map[string]interface{}{
-		"pipelineConfigIds": options.pipelineConfigId,
+	query := &gate.ExecutionsControllerApiGetLatestExecutionsByConfigIdsUsingGETOpts{
+		PipelineConfigIds: optional.NewString(options.pipelineConfigId),
 	}
 
 	var statuses []string
@@ -92,16 +89,15 @@ func listExecution(cmd *cobra.Command, options ListOptions) error {
 		statuses = append(statuses, "CANCELED")
 	}
 	if len(statuses) > 0 {
-		query["statuses"] = strings.Join(statuses, ",")
+		query.Statuses = optional.NewString(strings.Join(statuses, ","))
 	}
 
 	if options.limit > 0 {
-		query["limit"] = options.limit
+		query.Limit = optional.NewInt32(options.limit)
 	}
 
-	successPayload, resp, err := gateClient.ExecutionsControllerApi.GetLatestExecutionsByConfigIdsUsingGET(
-		gateClient.Context, query)
-
+	successPayload, resp, err := options.GateClient.ExecutionsControllerApi.GetLatestExecutionsByConfigIdsUsingGET(
+		options.GateClient.Context, query)
 	if err != nil {
 		return err
 	}
@@ -112,6 +108,6 @@ func listExecution(cmd *cobra.Command, options ListOptions) error {
 			resp.StatusCode)
 	}
 
-	util.UI.JsonOutput(successPayload, util.UI.OutputFormat)
+	options.Ui.JsonOutput(successPayload)
 	return nil
 }

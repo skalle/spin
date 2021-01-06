@@ -15,31 +15,68 @@
 package canary_config
 
 import (
+	"bytes"
 	"fmt"
-	"github.com/spinnaker/spin/util"
+	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
-	"os"
 	"strings"
 	"testing"
+
+	"github.com/andreyvit/diff"
+
+	"github.com/spinnaker/spin/cmd"
+	"github.com/spinnaker/spin/cmd/canary"
+	"github.com/spinnaker/spin/util"
 )
 
-func TestCanaryConfigGet_basic(t *testing.T) {
+func TestCanaryConfigGet_json(t *testing.T) {
 	ts := testGateCanaryConfigGetSuccess()
 	defer ts.Close()
 
-	// Exclude 'canary' since we are testing only the 'canary-config' subcommand.
-	args := []string{"canary-config", "get", "--id", "3f3dbcc1", "--gate-endpoint", ts.URL}
-	currentCmd := NewGetCmd(canaryConfigOptions{})
-	rootCmd := getRootCmdForTest()
-	canaryConfigCmd := NewCanaryConfigCmd(os.Stdout)
-	canaryConfigCmd.AddCommand(currentCmd)
-	rootCmd.AddCommand(canaryConfigCmd)
+	buffer := new(bytes.Buffer)
+	rootCmd, rootOpts := cmd.NewCmdRoot(buffer, buffer)
+	canaryCmd, canaryOpts := canary.NewCanaryCmd(rootOpts)
+	canaryCmd.AddCommand(NewCanaryConfigCmd(canaryOpts))
+	rootCmd.AddCommand(canaryCmd)
+
+	args := []string{"canary", "canary-config", "get", "--id", "3f3dbcc1", "--gate-endpoint", ts.URL}
 
 	rootCmd.SetArgs(args)
 	err := rootCmd.Execute()
 	if err != nil {
 		t.Fatalf("Command failed with: %s", err)
+	}
+
+	expected := strings.TrimSpace(canaryConfigGetJson)
+	recieved := strings.TrimSpace(buffer.String())
+	if expected != recieved {
+		t.Fatalf("Unexpected command output:\n%s", diff.LineDiff(expected, recieved))
+	}
+}
+
+func TestCanaryConfigGet_yaml(t *testing.T) {
+	ts := testGateCanaryConfigGetSuccess()
+	defer ts.Close()
+
+	buffer := new(bytes.Buffer)
+	rootCmd, rootOpts := cmd.NewCmdRoot(buffer, buffer)
+	canaryCmd, canaryOpts := canary.NewCanaryCmd(rootOpts)
+	canaryCmd.AddCommand(NewCanaryConfigCmd(canaryOpts))
+	rootCmd.AddCommand(canaryCmd)
+
+	args := []string{"canary", "canary-config", "get", "--id", "3f3dbcc1", "--output", "yaml", "--gate-endpoint", ts.URL}
+
+	rootCmd.SetArgs(args)
+	err := rootCmd.Execute()
+	if err != nil {
+		t.Fatalf("Command failed with: %s", err)
+	}
+
+	expected := strings.TrimSpace(canaryConfigGetYaml)
+	recieved := strings.TrimSpace(buffer.String())
+	if expected != recieved {
+		t.Fatalf("Unexpected command output:\n%s", diff.LineDiff(expected, recieved))
 	}
 }
 
@@ -47,34 +84,13 @@ func TestCanaryConfigGet_args(t *testing.T) {
 	ts := testGateCanaryConfigGetSuccess()
 	defer ts.Close()
 
-	// Exclude 'canary' since we are testing only the 'canary-config' subcommand.
+	rootCmd, rootOpts := cmd.NewCmdRoot(ioutil.Discard, ioutil.Discard)
+	canaryCmd, canaryOpts := canary.NewCanaryCmd(rootOpts)
+	canaryCmd.AddCommand(NewCanaryConfigCmd(canaryOpts))
+	rootCmd.AddCommand(canaryCmd)
+
 	// Missing 'id' argument.
-	args := []string{"canary-config", "get", "--gate-endpoint", ts.URL}
-	currentCmd := NewGetCmd(canaryConfigOptions{})
-	rootCmd := getRootCmdForTest()
-	canaryConfigCmd := NewCanaryConfigCmd(os.Stdout)
-	canaryConfigCmd.AddCommand(currentCmd)
-	rootCmd.AddCommand(canaryConfigCmd)
-
-	rootCmd.SetArgs(args)
-	err := rootCmd.Execute()
-	if err == nil {
-		t.Fatalf("Command failed with: %s", err)
-	}
-}
-
-func TestCanaryConfigGet_malformed(t *testing.T) {
-	ts := testGateCanaryConfigGetMalformed()
-	defer ts.Close()
-
-	// Exclude 'canary' since we are testing only the 'canary-config' subcommand.
-	args := []string{"canary-config", "get", "--id", "3f3dbcc1", "--gate-endpoint", ts.URL}
-	currentCmd := NewGetCmd(canaryConfigOptions{})
-	rootCmd := getRootCmdForTest()
-	canaryConfigCmd := NewCanaryConfigCmd(os.Stdout)
-	canaryConfigCmd.AddCommand(currentCmd)
-	rootCmd.AddCommand(canaryConfigCmd)
-
+	args := []string{"canary", "canary-config", "get", "--gate-endpoint", ts.URL}
 	rootCmd.SetArgs(args)
 	err := rootCmd.Execute()
 	if err == nil {
@@ -83,17 +99,15 @@ func TestCanaryConfigGet_malformed(t *testing.T) {
 }
 
 func TestCanaryConfigGet_fail(t *testing.T) {
-	ts := GateServerFail()
+	ts := testGateFail()
 	defer ts.Close()
 
-	// Exclude 'canary' since we are testing only the 'canary-config' subcommand.
-	args := []string{"canary-config", "get", "--id", "3f3dbcc1", "--gate-endpoint", ts.URL}
-	currentCmd := NewGetCmd(canaryConfigOptions{})
-	rootCmd := getRootCmdForTest()
-	canaryConfigCmd := NewCanaryConfigCmd(os.Stdout)
-	canaryConfigCmd.AddCommand(currentCmd)
-	rootCmd.AddCommand(canaryConfigCmd)
+	rootCmd, rootOpts := cmd.NewCmdRoot(ioutil.Discard, ioutil.Discard)
+	canaryCmd, canaryOpts := canary.NewCanaryCmd(rootOpts)
+	canaryCmd.AddCommand(NewCanaryConfigCmd(canaryOpts))
+	rootCmd.AddCommand(canaryCmd)
 
+	args := []string{"canary", "canary-config", "get", "--id", "3f3dbcc1", "--gate-endpoint", ts.URL}
 	rootCmd.SetArgs(args)
 	err := rootCmd.Execute()
 	if err == nil {
@@ -105,13 +119,12 @@ func TestPipelineGet_notfound(t *testing.T) {
 	ts := testGateCanaryConfigGetMissing()
 	defer ts.Close()
 
-	currentCmd := NewGetCmd(canaryConfigOptions{})
-	rootCmd := getRootCmdForTest()
-	pipelineTemplateCmd := NewCanaryConfigCmd(os.Stdout)
-	pipelineTemplateCmd.AddCommand(currentCmd)
-	rootCmd.AddCommand(pipelineTemplateCmd)
+	rootCmd, rootOpts := cmd.NewCmdRoot(ioutil.Discard, ioutil.Discard)
+	canaryCmd, canaryOpts := canary.NewCanaryCmd(rootOpts)
+	canaryCmd.AddCommand(NewCanaryConfigCmd(canaryOpts))
+	rootCmd.AddCommand(canaryCmd)
 
-	args := []string{"canary-config", "get", "--id", "3f3dbcc1", "--gate-endpoint", ts.URL}
+	args := []string{"canary", "canary-config", "get", "--id", "3f3dbcc1", "--gate-endpoint", ts.URL}
 	rootCmd.SetArgs(args)
 
 	err := rootCmd.Execute()
@@ -127,18 +140,8 @@ func testGateCanaryConfigGetSuccess() *httptest.Server {
 	mux.Handle(
 		"/v2/canaryConfig/",
 		http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Add("content-type", "application/json")
 			fmt.Fprintln(w, strings.TrimSpace(canaryConfigGetJson))
-		}))
-	return httptest.NewServer(mux)
-}
-
-// testGateCanaryConfigGetMalformed returns a malformed get of canaryConfig configs.
-func testGateCanaryConfigGetMalformed() *httptest.Server {
-	mux := util.TestGateMuxWithVersionHandler()
-	mux.Handle(
-		"/v2/canaryConfig/",
-		http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			fmt.Fprintln(w, strings.TrimSpace(malformedCanaryConfigGetJson))
 		}))
 	return httptest.NewServer(mux)
 }
@@ -152,18 +155,6 @@ func testGateCanaryConfigGetMissing() *httptest.Server {
 	return httptest.NewServer(mux)
 }
 
-const malformedCanaryConfigGetJson = `
-{{
- "applications": [
-  "canaryconfigs"
- ],
- "id": "3f3dbcc1-002d-458c-b181-be4aa809922a",
- "name": "exampleCanary",
- "updatedTimestamp": 1568131247595,
- "updatedTimestampIso": "2019-09-10T16:00:47.595Z"
-}
-`
-
 const canaryConfigGetJson = `
 {
  "applications": [
@@ -174,4 +165,13 @@ const canaryConfigGetJson = `
  "updatedTimestamp": 1568131247595,
  "updatedTimestampIso": "2019-09-10T16:00:47.595Z"
 }
+`
+
+const canaryConfigGetYaml = `
+applications:
+- canaryconfigs
+id: 3f3dbcc1-002d-458c-b181-be4aa809922a
+name: exampleCanary
+updatedTimestamp: 1568131247595
+updatedTimestampIso: "2019-09-10T16:00:47.595Z"
 `

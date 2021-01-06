@@ -18,19 +18,23 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"strings"
 
+	"github.com/antihax/optional"
 	"github.com/spf13/cobra"
-	"github.com/spinnaker/spin/cmd/gateclient"
+
+	gate "github.com/spinnaker/spin/gateapi"
 	"github.com/spinnaker/spin/util"
 )
 
-type ExecuteOptions struct {
-	*pipelineOptions
+type executeOptions struct {
+	*PipelineOptions
 	output        string
 	application   string
 	name          string
 	parameterFile string
 	artifactsFile string
+	parameters    []string
 }
 
 var (
@@ -38,9 +42,9 @@ var (
 	executePipelineLong  = "Execute the provided pipeline"
 )
 
-func NewExecuteCmd(pipelineOptions pipelineOptions) *cobra.Command {
-	options := ExecuteOptions{
-		pipelineOptions: &pipelineOptions,
+func NewExecuteCmd(pipelineOptions *PipelineOptions) *cobra.Command {
+	options := &executeOptions{
+		PipelineOptions: pipelineOptions,
 	}
 	cmd := &cobra.Command{
 		Use:     "execute",
@@ -56,28 +60,35 @@ func NewExecuteCmd(pipelineOptions pipelineOptions) *cobra.Command {
 	cmd.PersistentFlags().StringVarP(&options.name, "name", "n", "", "name of the pipeline to execute")
 	cmd.PersistentFlags().StringVarP(&options.parameterFile, "parameter-file", "f", "", "file to load pipeline parameter values from")
 	cmd.PersistentFlags().StringVarP(&options.artifactsFile, "artifacts-file", "t", "", "file to load pipeline artifacts from")
+	cmd.PersistentFlags().StringSliceVarP(&options.parameters, "parameter", "p", []string{}, "parameter in the form of key=value. can be used repeatedly.")
 
 	return cmd
 }
 
-func executePipeline(cmd *cobra.Command, options ExecuteOptions) error {
-	gateClient, err := gateclient.NewGateClient(cmd.InheritedFlags())
-	if err != nil {
-		return err
-	}
-
+func executePipeline(cmd *cobra.Command, options *executeOptions) error {
 	if options.application == "" || options.name == "" {
 		return errors.New("one of required parameters 'application' or 'name' not set")
 	}
 
 	parameters := map[string]interface{}{}
-	parameters, err = util.ParseJsonFromFile(options.parameterFile, true)
-	if err != nil {
-		return fmt.Errorf("Could not parse supplied pipeline parameters: %v.\n", err)
+	if options.parameterFile != "" {
+		p, err := util.ParseJsonFromFile(options.parameterFile, true)
+		if err != nil {
+			return fmt.Errorf("Could not parse supplied pipeline parameters: %v.\n", err)
+		}
+		parameters = p
+	} else if len(options.parameters) > 0 {
+		for _, p := range options.parameters {
+			// split each passed parameter on =
+			kv := strings.SplitN(p, "=", 2)
+			if len(kv) == 2 {
+				parameters[kv[0]] = kv[1]
+			}
+		}
 	}
 
 	artifactsFile := map[string]interface{}{}
-	artifactsFile, err = util.ParseJsonFromFile(options.artifactsFile, true)
+	artifactsFile, err := util.ParseJsonFromFile(options.artifactsFile, true)
 	if err != nil {
 		return fmt.Errorf("Could not parse supplied artifacts: %v.\n", err)
 	}
@@ -94,11 +105,10 @@ func executePipeline(cmd *cobra.Command, options ExecuteOptions) error {
 		}
 	}
 
-	resp, err := gateClient.PipelineControllerApi.InvokePipelineConfigUsingPOST1(gateClient.Context,
+	resp, err := options.GateClient.PipelineControllerApi.InvokePipelineConfigUsingPOST1(options.GateClient.Context,
 		options.application,
 		options.name,
-		map[string]interface{}{"trigger": trigger})
-
+		&gate.PipelineControllerApiInvokePipelineConfigUsingPOST1Opts{Trigger: optional.NewInterface(trigger)})
 	if err != nil {
 		return fmt.Errorf("Execute pipeline failed with response: %v and error: %s\n", resp, err)
 	}
@@ -107,7 +117,7 @@ func executePipeline(cmd *cobra.Command, options ExecuteOptions) error {
 		return fmt.Errorf("Encountered an error executing pipeline, status code: %d\n", resp.StatusCode)
 	}
 
-	util.UI.Info(util.Colorize().Color(fmt.Sprintf("[reset][bold][green]Pipeline execution started")))
+	options.Ui.Success("Pipeline execution started")
 
 	return nil
 }

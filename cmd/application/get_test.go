@@ -15,43 +15,31 @@
 package application
 
 import (
+	"bytes"
 	"fmt"
+	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
-	"os"
 	"strings"
 	"testing"
 
-	"github.com/spinnaker/spin/util"
+	"github.com/andreyvit/diff"
 
-	"github.com/spf13/cobra"
+	"github.com/spinnaker/spin/cmd"
+	"github.com/spinnaker/spin/util"
 )
 
 const (
 	APP = "app"
 )
 
-func getRootCmdForTest() *cobra.Command {
-	rootCmd := &cobra.Command{}
-	rootCmd.PersistentFlags().String("config", "", "config file (default is $HOME/.spin/config)")
-	rootCmd.PersistentFlags().String("gate-endpoint", "", "Gate (API server) endpoint. Default http://localhost:8084")
-	rootCmd.PersistentFlags().Bool("insecure", false, "Ignore Certificate Errors")
-	rootCmd.PersistentFlags().Bool("quiet", false, "Squelch non-essential output")
-	rootCmd.PersistentFlags().Bool("no-color", false, "Disable color")
-	rootCmd.PersistentFlags().String("output", "", "Configure output formatting")
-	rootCmd.PersistentFlags().String("default-headers", "", "Configure additional headers for gate client requests")
-	util.InitUI(false, false, "")
-	return rootCmd
-}
-
-func TestApplicationGet_basic(t *testing.T) {
+func TestApplicationGet_json(t *testing.T) {
 	ts := testGateApplicationGetSuccess()
 	defer ts.Close()
-	currentCmd := NewGetCmd(applicationOptions{})
-	rootCmd := getRootCmdForTest()
-	appCmd := NewApplicationCmd(os.Stdout)
-	appCmd.AddCommand(currentCmd)
-	rootCmd.AddCommand(appCmd)
+
+	buffer := new(bytes.Buffer)
+	rootCmd, rootOpts := cmd.NewCmdRoot(buffer, buffer)
+	rootCmd.AddCommand(NewApplicationCmd(rootOpts))
 
 	args := []string{"application", "get", APP, "--gate-endpoint=" + ts.URL}
 	rootCmd.SetArgs(args)
@@ -59,16 +47,65 @@ func TestApplicationGet_basic(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Command failed with: %s", err)
 	}
+
+	expected := strings.TrimSpace(applicationJson)
+	recieved := strings.TrimSpace(buffer.String())
+	if expected != recieved {
+		t.Fatalf("Unexpected command output:\n%s", diff.LineDiff(expected, recieved))
+	}
+}
+
+func TestApplicationGet_jsonpath(t *testing.T) {
+	ts := testGateApplicationGetSuccess()
+	defer ts.Close()
+
+	buffer := new(bytes.Buffer)
+	rootCmd, rootOpts := cmd.NewCmdRoot(buffer, buffer)
+	rootCmd.AddCommand(NewApplicationCmd(rootOpts))
+
+	args := []string{"application", "get", APP, "--output", "jsonpath={.permissions}", "--gate-endpoint=" + ts.URL}
+	rootCmd.SetArgs(args)
+	err := rootCmd.Execute()
+	if err != nil {
+		t.Fatalf("Command failed with: %s", err)
+	}
+
+	expected := strings.TrimSpace(permissionsJson)
+	recieved := strings.TrimSpace(buffer.String())
+	if expected != recieved {
+		t.Fatalf("Unexpected command output:\n%s", diff.LineDiff(expected, recieved))
+	}
+}
+
+func TestApplicationGet_yaml(t *testing.T) {
+	ts := testGateApplicationGetSuccess()
+	defer ts.Close()
+
+	buffer := new(bytes.Buffer)
+	rootCmd, rootOpts := cmd.NewCmdRoot(buffer, buffer)
+	rootCmd.AddCommand(NewApplicationCmd(rootOpts))
+
+	args := []string{"application", "get", APP, "--output", "yaml", "--gate-endpoint=" + ts.URL}
+	rootCmd.SetArgs(args)
+	err := rootCmd.Execute()
+	if err != nil {
+		t.Fatalf("Command failed with: %s", err)
+	}
+
+	expected := strings.TrimSpace(applicationYaml)
+	recieved := strings.TrimSpace(buffer.String())
+	if expected != recieved {
+		t.Fatalf("Unexpected command output:\n%s", diff.LineDiff(expected, recieved))
+	}
 }
 
 func TestApplicationGet_flags(t *testing.T) {
 	ts := testGateApplicationGetSuccess()
 	defer ts.Close()
-	currentCmd := NewGetCmd(applicationOptions{})
-	rootCmd := getRootCmdForTest()
-	appCmd := NewApplicationCmd(os.Stdout)
-	appCmd.AddCommand(currentCmd)
-	rootCmd.AddCommand(appCmd)
+
+	rootCmd, rootOpts := cmd.NewCmdRoot(ioutil.Discard, ioutil.Discard)
+	rootCmd.AddCommand(NewApplicationCmd(rootOpts))
+
 	args := []string{"application", "get", "--gate-endpoint", ts.URL} // Missing positional arg.
 	rootCmd.SetArgs(args)
 	err := rootCmd.Execute()
@@ -77,33 +114,12 @@ func TestApplicationGet_flags(t *testing.T) {
 	}
 }
 
-func TestApplicationGet_malformed(t *testing.T) {
-	ts := testGateApplicationGetMalformed()
-	defer ts.Close()
-
-	currentCmd := NewGetCmd(applicationOptions{})
-	rootCmd := getRootCmdForTest()
-	appCmd := NewApplicationCmd(os.Stdout)
-	appCmd.AddCommand(currentCmd)
-	rootCmd.AddCommand(appCmd)
-
-	args := []string{"application", "get", APP, "--gate-endpoint=" + ts.URL}
-	rootCmd.SetArgs(args)
-	err := rootCmd.Execute()
-	if err == nil { // Success is actually failure here, return payload is malformed.
-		t.Fatalf("Command failed with: %d", err)
-	}
-}
-
 func TestApplicationGet_fail(t *testing.T) {
-	ts := GateServerFail()
+	ts := testGateFail()
 	defer ts.Close()
 
-	currentCmd := NewGetCmd(applicationOptions{})
-	rootCmd := getRootCmdForTest()
-	appCmd := NewApplicationCmd(os.Stdout)
-	appCmd.AddCommand(currentCmd)
-	rootCmd.AddCommand(appCmd)
+	rootCmd, rootOpts := cmd.NewCmdRoot(ioutil.Discard, ioutil.Discard)
+	rootCmd.AddCommand(NewApplicationCmd(rootOpts))
 
 	args := []string{"application", "get", APP, "--gate-endpoint=" + ts.URL}
 	rootCmd.SetArgs(args)
@@ -116,47 +132,118 @@ func TestApplicationGet_fail(t *testing.T) {
 // testGateApplicationGetSuccess spins up a local http server that we will configure the GateClient
 // to direct requests to. Responds with a 200 and a well-formed pipeline list.
 func testGateApplicationGetSuccess() *httptest.Server {
-	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		fmt.Fprintln(w, strings.TrimSpace(applicationJson))
+	mux := util.TestGateMuxWithVersionHandler()
+	mux.Handle("/applications/"+APP, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Add("content-type", "application/json")
+		fmt.Fprintln(w, strings.TrimSpace(applicationJsonExpanded))
 	}))
+	return httptest.NewServer(mux)
 }
 
-// testGateApplicationGetMalformed returns a malformed list of pipeline configs.
-func testGateApplicationGetMalformed() *httptest.Server {
-	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		fmt.Fprintln(w, strings.TrimSpace(malformedApplicationGetJson))
-	}))
-}
-
-const malformedApplicationGetJson = `
+// GET /applications/{app} returns an envelope with 'attributes' and 'clusters'.
+const applicationJsonExpanded = `
+{
+ "attributes": {
   "accounts": "account1",
   "cloudproviders": [
-    "gce",
-    "kubernetes"
+   "gce",
+   "kubernetes"
   ],
   "createTs": "1527261941734",
   "email": "app",
   "instancePort": 80,
   "lastModifiedBy": "anonymous",
   "name": "app",
+  "permissions": {
+    "EXECUTE": [
+	  "admin-group"
+	 ],
+	 "READ": [
+	  "admin-group",
+	  "user-group"
+	 ],
+	 "WRITE": [
+	  "admin-group"
+	 ]
+  },
   "updateTs": "1527261941735",
   "user": "anonymous"
+ },
+ "clusters": {
+  "account1": [
+   {
+    "loadBalancers": [],
+    "name": "deployment example-deployment",
+    "provider": "kubernetes",
+    "serverGroups": []
+   }
+  ]
+ }
 }
 `
 
 const applicationJson = `
 {
-  "accounts": "account1",
-  "cloudproviders": [
-    "gce",
-    "kubernetes"
+ "accounts": "account1",
+ "cloudproviders": [
+  "gce",
+  "kubernetes"
+ ],
+ "createTs": "1527261941734",
+ "email": "app",
+ "instancePort": 80,
+ "lastModifiedBy": "anonymous",
+ "name": "app",
+ "permissions": {
+  "EXECUTE": [
+   "admin-group"
   ],
-  "createTs": "1527261941734",
-  "email": "app",
-  "instancePort": 80,
-  "lastModifiedBy": "anonymous",
-  "name": "app",
-  "updateTs": "1527261941735",
-  "user": "anonymous"
+  "READ": [
+   "admin-group",
+   "user-group"
+  ],
+  "WRITE": [
+   "admin-group"
+  ]
+ },
+ "updateTs": "1527261941735",
+ "user": "anonymous"
+}
+`
+
+const applicationYaml = `
+accounts: account1
+cloudproviders:
+- gce
+- kubernetes
+createTs: "1527261941734"
+email: app
+instancePort: 80
+lastModifiedBy: anonymous
+name: app
+permissions:
+  EXECUTE:
+  - admin-group
+  READ:
+  - admin-group
+  - user-group
+  WRITE:
+  - admin-group
+updateTs: "1527261941735"
+user: anonymous
+`
+
+const permissionsJson = `
+{
+ "EXECUTE": [
+  "admin-group"
+ ],
+ "READ": [
+  "admin-group",
+  "user-group"
+ ],
+ "WRITE": [
+  "admin-group"
+ ]
 }
 `

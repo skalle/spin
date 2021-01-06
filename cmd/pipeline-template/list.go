@@ -18,12 +18,13 @@ import (
 	"fmt"
 	"net/http"
 
+	"github.com/antihax/optional"
 	"github.com/spf13/cobra"
-	"github.com/spinnaker/spin/cmd/gateclient"
-	"github.com/spinnaker/spin/util"
+
+	gate "github.com/spinnaker/spin/gateapi"
 )
 
-type ListOptions struct {
+type listOptions struct {
 	*pipelineTemplateOptions
 	scopes *[]string
 }
@@ -33,9 +34,9 @@ var (
 	listPipelineTemplateLong  = "List the pipeline templates for the provided scopes"
 )
 
-func NewListCmd(pipelineTemplateOptions pipelineTemplateOptions) *cobra.Command {
-	options := ListOptions{
-		pipelineTemplateOptions: &pipelineTemplateOptions,
+func NewListCmd(pipelineTemplateOptions *pipelineTemplateOptions) *cobra.Command {
+	options := &listOptions{
+		pipelineTemplateOptions: pipelineTemplateOptions,
 	}
 	cmd := &cobra.Command{
 		Use:     "list",
@@ -53,15 +54,9 @@ func NewListCmd(pipelineTemplateOptions pipelineTemplateOptions) *cobra.Command 
 	return cmd
 }
 
-func listPipelineTemplate(cmd *cobra.Command, options ListOptions) error {
-	gateClient, err := gateclient.NewGateClient(cmd.InheritedFlags())
-	if err != nil {
-		return err
-	}
-
-	successPayload, resp, err := gateClient.V2PipelineTemplatesControllerApi.ListUsingGET1(gateClient.Context,
-		map[string]interface{}{"scopes": options.scopes})
-
+func listPipelineTemplate(cmd *cobra.Command, options *listOptions) error {
+	successPayload, resp, err := options.GateClient.V2PipelineTemplatesControllerApi.ListUsingGET1(options.GateClient.Context,
+		&gate.V2PipelineTemplatesControllerApiListUsingGET1Opts{Scopes: optional.NewInterface(options.scopes)})
 	if err != nil {
 		return err
 	}
@@ -72,6 +67,6 @@ func listPipelineTemplate(cmd *cobra.Command, options ListOptions) error {
 			resp.StatusCode)
 	}
 
-	util.UI.JsonOutput(successPayload, util.UI.OutputFormat)
+	options.Ui.JsonOutput(successPayload)
 	return nil
 }

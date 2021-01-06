@@ -16,23 +16,22 @@ package account
 
 import (
 	"fmt"
-	"github.com/spinnaker/spin/util"
+	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
-	"os"
 	"strings"
 	"testing"
+
+	"github.com/spinnaker/spin/cmd"
+	"github.com/spinnaker/spin/util"
 )
 
 func TestAccountList_basic(t *testing.T) {
 	ts := testGateAccountListSuccess()
 	defer ts.Close()
 
-	currentCmd := NewListCmd(accountOptions{})
-	rootCmd := getRootCmdForTest()
-	accCmd := NewAccountCmd(os.Stdout)
-	accCmd.AddCommand(currentCmd)
-	rootCmd.AddCommand(accCmd)
+	rootCmd, options := cmd.NewCmdRoot(ioutil.Discard, ioutil.Discard)
+	rootCmd.AddCommand(NewAccountCmd(options))
 
 	args := []string{"account", "list", "--gate-endpoint=" + ts.URL}
 	rootCmd.SetArgs(args)
@@ -42,33 +41,12 @@ func TestAccountList_basic(t *testing.T) {
 	}
 }
 
-func TestAccountList_malformed(t *testing.T) {
-	ts := testGateAccountListMalformed()
-	defer ts.Close()
-
-	currentCmd := NewListCmd(accountOptions{})
-	rootCmd := getRootCmdForTest()
-	accCmd := NewAccountCmd(os.Stdout)
-	accCmd.AddCommand(currentCmd)
-	rootCmd.AddCommand(accCmd)
-
-	args := []string{"account", "list", "--gate-endpoint=" + ts.URL}
-	rootCmd.SetArgs(args)
-	err := rootCmd.Execute()
-	if err == nil {
-		t.Fatalf("Command failed with: %s", err)
-	}
-}
-
 func TestAccountList_fail(t *testing.T) {
-	ts := GateServerFail()
+	ts := testGateFail()
 	defer ts.Close()
 
-	currentCmd := NewListCmd(accountOptions{})
-	rootCmd := getRootCmdForTest()
-	accCmd := NewAccountCmd(os.Stdout)
-	accCmd.AddCommand(currentCmd)
-	rootCmd.AddCommand(accCmd)
+	rootCmd, options := cmd.NewCmdRoot(ioutil.Discard, ioutil.Discard)
+	rootCmd.AddCommand(NewAccountCmd(options))
 
 	args := []string{"account", "list", "--gate-endpoint=" + ts.URL}
 	rootCmd.SetArgs(args)
@@ -81,34 +59,11 @@ func TestAccountList_fail(t *testing.T) {
 func testGateAccountListSuccess() *httptest.Server {
 	mux := util.TestGateMuxWithVersionHandler()
 	mux.Handle("/credentials/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Add("content-type", "application/json")
 		fmt.Fprintln(w, strings.TrimSpace(accountListJson))
 	}))
 	return httptest.NewServer(mux)
 }
-
-func testGateAccountListMalformed() *httptest.Server {
-	mux := util.TestGateMuxWithVersionHandler()
-	mux.Handle("/credentials/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		fmt.Fprintln(w, strings.TrimSpace(malformedAccountListJson))
-	}))
-	return httptest.NewServer(mux)
-}
-
-const malformedAccountListJson = `
-	{
-	  "type": "kubernetes",
-	  "skin": "v2",
-	  "providerVersion": "v2",
-	  "name": "foobar"
-	 },
-	 {
-	  "type": "dockerRegistry",
-	  "skin": "v1",
-	  "providerVersion": "v1",
-	  "name": "dockerhub"
-	 }
-]
-`
 
 const accountListJson = `[
 {

@@ -16,16 +16,17 @@ package pipeline
 
 import (
 	"fmt"
+	"io/ioutil"
 	"net/http"
 
 	"github.com/spf13/cobra"
-	"github.com/spinnaker/spin/cmd/gateclient"
 
+	gate "github.com/spinnaker/spin/gateapi"
 	"github.com/spinnaker/spin/util"
 )
 
-type SaveOptions struct {
-	*pipelineOptions
+type saveOptions struct {
+	*PipelineOptions
 	output       string
 	pipelineFile string
 }
@@ -35,9 +36,9 @@ var (
 	savePipelineLong  = "Save the provided pipeline"
 )
 
-func NewSaveCmd(pipelineOptions pipelineOptions) *cobra.Command {
-	options := SaveOptions{
-		pipelineOptions: &pipelineOptions,
+func NewSaveCmd(pipelineOptions *PipelineOptions) *cobra.Command {
+	options := &saveOptions{
+		PipelineOptions: pipelineOptions,
 	}
 	cmd := &cobra.Command{
 		Use:     "save",
@@ -54,65 +55,61 @@ func NewSaveCmd(pipelineOptions pipelineOptions) *cobra.Command {
 	return cmd
 }
 
-func savePipeline(cmd *cobra.Command, options SaveOptions) error {
-	gateClient, err := gateclient.NewGateClient(cmd.InheritedFlags())
-	if err != nil {
-		return err
-	}
-
+func savePipeline(cmd *cobra.Command, options *saveOptions) error {
 	pipelineJson, err := util.ParseJsonFromFileOrStdin(options.pipelineFile, false)
 	if err != nil {
 		return err
 	}
 	valid := true
 	if _, exists := pipelineJson["name"]; !exists {
-		util.UI.Error("Required pipeline key 'name' missing...\n")
+		options.Ui.Error("Required pipeline key 'name' missing...\n")
 		valid = false
 	}
 
 	if _, exists := pipelineJson["application"]; !exists {
-		util.UI.Error("Required pipeline key 'application' missing...\n")
+		options.Ui.Error("Required pipeline key 'application' missing...\n")
 		valid = false
 	}
 
 	if template, exists := pipelineJson["template"]; exists && len(template.(map[string]interface{})) > 0 {
 		if _, exists := pipelineJson["schema"]; !exists {
-			util.UI.Error("Required pipeline key 'schema' missing for templated pipeline...\n")
+			options.Ui.Error("Required pipeline key 'schema' missing for templated pipeline...\n")
 			valid = false
 		}
-	    pipelineJson["type"] = "templatedPipeline"
+		pipelineJson["type"] = "templatedPipeline"
 	}
 
 	if !valid {
 		return fmt.Errorf("Submitted pipeline is invalid: %s\n", pipelineJson)
 	}
+
 	application := pipelineJson["application"].(string)
 	pipelineName := pipelineJson["name"].(string)
 
-	foundPipeline, queryResp, _ := gateClient.ApplicationControllerApi.GetPipelineConfigUsingGET(gateClient.Context, application, pipelineName)
-
-	if queryResp.StatusCode != http.StatusOK {
-		return fmt.Errorf("Encountered an error querying pipeline, status code: %d\n", queryResp.StatusCode)
+	foundPipeline, queryResp, _ := options.GateClient.ApplicationControllerApi.GetPipelineConfigUsingGET(options.GateClient.Context, application, pipelineName)
+	switch queryResp.StatusCode {
+	case http.StatusOK:
+		// pipeline found, let's use Spinnaker's known Pipeline ID, otherwise we'll get one created for us
+		if len(foundPipeline) > 0 {
+			pipelineJson["id"] = foundPipeline["id"].(string)
+		}
+	case http.StatusNotFound:
+		// pipeline doesn't exists, let's create a new one
+	default:
+		b, _ := ioutil.ReadAll(queryResp.Body)
+		return fmt.Errorf("unhandled response %d: %s", queryResp.StatusCode, b)
 	}
 
-	_, exists := pipelineJson["id"].(string)
-	var foundPipelineId string
-	if len(foundPipeline) > 0 {
-		foundPipelineId = foundPipeline["id"].(string)
-	}
-	if !exists && foundPipelineId != "" {
-		pipelineJson["id"] = foundPipelineId
-	}
-
-	saveResp, saveErr := gateClient.PipelineControllerApi.SavePipelineUsingPOST(gateClient.Context, pipelineJson)
-
-	if saveErr != nil {
-		return saveErr
+	// TODO: support option passing in and remove nil in below call
+	opt := &gate.PipelineControllerApiSavePipelineUsingPOSTOpts{}
+	saveResp, err := options.GateClient.PipelineControllerApi.SavePipelineUsingPOST(options.GateClient.Context, pipelineJson, opt)
+	if err != nil {
+		return err
 	}
 	if saveResp.StatusCode != http.StatusOK {
 		return fmt.Errorf("Encountered an error saving pipeline, status code: %d\n", saveResp.StatusCode)
 	}
 
-	util.UI.Info(util.Colorize().Color(fmt.Sprintf("[reset][bold][green]Pipeline save succeeded")))
+	options.Ui.Success("Pipeline save succeeded")
 	return nil
 }

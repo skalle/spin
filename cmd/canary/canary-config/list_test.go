@@ -16,40 +16,27 @@ package canary_config
 
 import (
 	"fmt"
-	"github.com/spf13/cobra"
-	"github.com/spinnaker/spin/util"
+	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
-	"os"
 	"strings"
 	"testing"
-)
 
-func getRootCmdForTest() *cobra.Command {
-	rootCmd := &cobra.Command{}
-	rootCmd.PersistentFlags().String("config", "", "config file (default is $HOME/.spin/config)")
-	rootCmd.PersistentFlags().String("gate-endpoint", "", "Gate (API server) endpoint. Default http://localhost:8084")
-	rootCmd.PersistentFlags().Bool("insecure", false, "Ignore Certificate Errors")
-	rootCmd.PersistentFlags().Bool("quiet", false, "Squelch non-essential output")
-	rootCmd.PersistentFlags().Bool("no-color", false, "Disable color")
-	rootCmd.PersistentFlags().String("output", "", "Configure output formatting")
-	rootCmd.PersistentFlags().String("default-headers", "", "Configure additional headers for gate client requests")
-	util.InitUI(false, false, "")
-	return rootCmd
-}
+	"github.com/spinnaker/spin/cmd"
+	"github.com/spinnaker/spin/cmd/canary"
+	"github.com/spinnaker/spin/util"
+)
 
 func TestCanaryConfigList_basic(t *testing.T) {
 	ts := testGateCanaryConfigListSuccess()
 	defer ts.Close()
 
-	// Exclude 'canary' since we are testing only the 'canary-config' subcommand.
-	args := []string{"canary-config", "list", "--gate-endpoint", ts.URL}
-	currentCmd := NewListCmd(canaryConfigOptions{})
-	rootCmd := getRootCmdForTest()
-	canaryConfigCmd := NewCanaryConfigCmd(os.Stdout)
-	canaryConfigCmd.AddCommand(currentCmd)
-	rootCmd.AddCommand(canaryConfigCmd)
+	rootCmd, rootOpts := cmd.NewCmdRoot(ioutil.Discard, ioutil.Discard)
+	canaryCmd, canaryOpts := canary.NewCanaryCmd(rootOpts)
+	canaryCmd.AddCommand(NewCanaryConfigCmd(canaryOpts))
+	rootCmd.AddCommand(canaryCmd)
 
+	args := []string{"canary", "canary-config", "list", "--gate-endpoint", ts.URL}
 	rootCmd.SetArgs(args)
 	err := rootCmd.Execute()
 	if err != nil {
@@ -57,37 +44,16 @@ func TestCanaryConfigList_basic(t *testing.T) {
 	}
 }
 
-func TestCanaryConfigList_malformed(t *testing.T) {
-	ts := testGateCanaryConfigListMalformed()
-	defer ts.Close()
-
-	// Exclude 'canary' since we are testing only the 'canary-config' subcommand.
-	args := []string{"canary-config", "list", "--gate-endpoint", ts.URL}
-	currentCmd := NewListCmd(canaryConfigOptions{})
-	rootCmd := getRootCmdForTest()
-	canaryConfigCmd := NewCanaryConfigCmd(os.Stdout)
-	canaryConfigCmd.AddCommand(currentCmd)
-	rootCmd.AddCommand(canaryConfigCmd)
-
-	rootCmd.SetArgs(args)
-	err := rootCmd.Execute()
-	if err == nil {
-		t.Fatalf("Command failed with: %s", err)
-	}
-}
-
 func TestCanaryConfigList_fail(t *testing.T) {
-	ts := GateServerFail()
+	ts := testGateFail()
 	defer ts.Close()
 
-	// Exclude 'canary' since we are testing only the 'canary-config' subcommand.
-	args := []string{"canary-config", "list", "--gate-endpoint", ts.URL}
-	currentCmd := NewListCmd(canaryConfigOptions{})
-	rootCmd := getRootCmdForTest()
-	canaryConfigCmd := NewCanaryConfigCmd(os.Stdout)
-	canaryConfigCmd.AddCommand(currentCmd)
-	rootCmd.AddCommand(canaryConfigCmd)
+	rootCmd, rootOpts := cmd.NewCmdRoot(ioutil.Discard, ioutil.Discard)
+	canaryCmd, canaryOpts := canary.NewCanaryCmd(rootOpts)
+	canaryCmd.AddCommand(NewCanaryConfigCmd(canaryOpts))
+	rootCmd.AddCommand(canaryCmd)
 
+	args := []string{"canary", "canary-config", "list", "--gate-endpoint", ts.URL}
 	rootCmd.SetArgs(args)
 	err := rootCmd.Execute()
 	if err == nil {
@@ -102,42 +68,20 @@ func testGateCanaryConfigListSuccess() *httptest.Server {
 	mux.Handle(
 		"/v2/canaryConfig",
 		http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Add("content-type", "application/json")
 			fmt.Fprintln(w, strings.TrimSpace(canaryConfigListJson))
 		}))
 	return httptest.NewServer(mux)
 }
 
-// testGateCanaryConfigListMalformed returns a malformed list of canaryConfig configs.
-func testGateCanaryConfigListMalformed() *httptest.Server {
-	mux := util.TestGateMuxWithVersionHandler()
-	mux.Handle(
-		"/v2/canaryConfig",
-		http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			fmt.Fprintln(w, strings.TrimSpace(malformedCanaryConfigListJson))
-		}))
-	return httptest.NewServer(mux)
-}
-
-// GateServerFail spins up a local http server that we will configure the GateClient
+// testGateFail spins up a local http server that we will configure the GateClient
 // to direct requests to. Responds with a 500 InternalServerError.
-func GateServerFail() *httptest.Server {
+func testGateFail() *httptest.Server {
 	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Add("content-type", "application/json")
 		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 	}))
 }
-
-const malformedCanaryConfigListJson = `
- {
-  "applications": [
-   "canaryconfigs"
-  ],
-  "id": "3f3dbcc1-002d-458c-b181-be4aa809922a",
-  "name": "exampleCanary",
-  "updatedTimestamp": 1568131247595,
-  "updatedTimestampIso": "2019-09-10T16:00:47.595Z"
- }
-]
-`
 
 const canaryConfigListJson = `
 [

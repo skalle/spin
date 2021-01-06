@@ -18,8 +18,10 @@ import (
 	"fmt"
 	"net/http"
 
+	"github.com/antihax/optional"
 	"github.com/spf13/cobra"
-	"github.com/spinnaker/spin/cmd/gateclient"
+
+	gate "github.com/spinnaker/spin/gateapi"
 	"github.com/spinnaker/spin/util"
 )
 
@@ -28,35 +30,38 @@ var (
 	getExecutionLong  = "Get the execution with the provided id "
 )
 
-func NewGetCmd() *cobra.Command {
+type getOptions struct {
+	*executionOptions
+}
+
+func NewGetCmd(executionOptions *executionOptions) *cobra.Command {
+	options := &getOptions{
+		executionOptions: executionOptions,
+	}
 	cmd := &cobra.Command{
 		Use:   "get",
 		Short: getExecutionShort,
 		Long:  getExecutionLong,
-		RunE:  getExecution,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return getExecution(cmd, options, args)
+		},
 	}
 	return cmd
 }
 
-func getExecution(cmd *cobra.Command, args []string) error {
-	gateClient, err := gateclient.NewGateClient(cmd.InheritedFlags())
-	if err != nil {
-		return err
-	}
-
+func getExecution(cmd *cobra.Command, options *getOptions, args []string) error {
 	id, err := util.ReadArgsOrStdin(args)
 	if err != nil {
 		return err
 	}
 
-	query := map[string]interface{}{
-		"executionIds": id, // Status filtering is ignored when executionId is supplied
-		"limit":        int32(1),
+	query := &gate.ExecutionsControllerApiGetLatestExecutionsByConfigIdsUsingGETOpts{
+		ExecutionIds: optional.NewString(id), // Status filtering is ignored when executionId is supplied
+		Limit:        optional.NewInt32(1),
 	}
 
-	successPayload, resp, err := gateClient.ExecutionsControllerApi.GetLatestExecutionsByConfigIdsUsingGET(
-		gateClient.Context, query)
-
+	successPayload, resp, err := options.GateClient.ExecutionsControllerApi.GetLatestExecutionsByConfigIdsUsingGET(
+		options.GateClient.Context, query)
 	if err != nil {
 		return err
 	}
@@ -67,6 +72,6 @@ func getExecution(cmd *cobra.Command, args []string) error {
 			resp.StatusCode)
 	}
 
-	util.UI.JsonOutput(successPayload, util.UI.OutputFormat)
+	options.Ui.JsonOutput(successPayload)
 	return nil
 }

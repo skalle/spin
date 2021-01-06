@@ -16,13 +16,16 @@ package account
 
 import (
 	"fmt"
-	"github.com/spf13/cobra"
-	"github.com/spinnaker/spin/cmd/gateclient"
-	"github.com/spinnaker/spin/util"
 	"net/http"
+
+	gate "github.com/spinnaker/spin/gateapi"
+
+	"github.com/spf13/cobra"
+
+	"github.com/spinnaker/spin/util"
 )
 
-type GetOptions struct {
+type getOptions struct {
 	*accountOptions
 }
 
@@ -32,9 +35,9 @@ var (
 	getAccountExample = "usage: spin account get [options] account-name"
 )
 
-func NewGetCmd(accOptions accountOptions) *cobra.Command {
-	options := GetOptions{
-		accountOptions: &accOptions,
+func NewGetCmd(accOptions *accountOptions) *cobra.Command {
+	options := &getOptions{
+		accountOptions: accOptions,
 	}
 
 	cmd := &cobra.Command{
@@ -50,22 +53,20 @@ func NewGetCmd(accOptions accountOptions) *cobra.Command {
 	return cmd
 }
 
-func getAccount(cmd *cobra.Command, options GetOptions, args []string) error {
-	gateClient, err := gateclient.NewGateClient(cmd.InheritedFlags())
-	if err != nil {
-		return err
-	}
-
+func getAccount(cmd *cobra.Command, options *getOptions, args []string) error {
 	accountName, err := util.ReadArgsOrStdin(args)
 	if err != nil {
 		return err
 	}
 
-	account, resp, err := gateClient.CredentialsControllerApi.GetAccountUsingGET(gateClient.Context, accountName, map[string]interface{}{})
+	account, resp, err := options.GateClient.CredentialsControllerApi.GetAccountUsingGET(options.GateClient.Context, accountName, &gate.CredentialsControllerApiGetAccountUsingGETOpts{})
 	if resp != nil {
-		if resp.StatusCode == http.StatusNotFound {
+		switch resp.StatusCode {
+		case http.StatusOK:
+			// pass
+		case http.StatusNotFound:
 			return fmt.Errorf("Account '%s' not found\n", accountName)
-		} else if resp.StatusCode != http.StatusOK {
+		default:
 			return fmt.Errorf("Encountered an error getting account, status code: %d\n", resp.StatusCode)
 		}
 	}
@@ -73,7 +74,7 @@ func getAccount(cmd *cobra.Command, options GetOptions, args []string) error {
 	if err != nil {
 		return err
 	}
-	util.UI.JsonOutput(account, util.UI.OutputFormat)
+	options.Ui.JsonOutput(account)
 
 	return nil
 }

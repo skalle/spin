@@ -16,13 +16,15 @@ package canary_config
 
 import (
 	"fmt"
-	"github.com/spf13/cobra"
-	"github.com/spinnaker/spin/cmd/gateclient"
-	"github.com/spinnaker/spin/util"
 	"net/http"
+
+	"github.com/spf13/cobra"
+
+	gate "github.com/spinnaker/spin/gateapi"
+	"github.com/spinnaker/spin/util"
 )
 
-type DeleteOptions struct {
+type deleteOptions struct {
 	*canaryConfigOptions
 }
 
@@ -31,34 +33,31 @@ const (
 	deleteCanaryConfigLong  = "Delete the provided canary config"
 )
 
-func NewDeleteCmd() *cobra.Command {
+func NewDeleteCmd(canaryConfigOptions *canaryConfigOptions) *cobra.Command {
+	options := &deleteOptions{
+		canaryConfigOptions: canaryConfigOptions,
+	}
 	cmd := &cobra.Command{
 		Use:     "delete",
 		Aliases: []string{"del"},
 		Short:   deleteCanaryConfigShort,
 		Long:    deleteCanaryConfigLong,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return deleteCanaryConfig(cmd, args)
+			return deleteCanaryConfig(cmd, options, args)
 		},
 	}
 
 	return cmd
 }
 
-func deleteCanaryConfig(cmd *cobra.Command, args []string) error {
-	gateClient, err := gateclient.NewGateClient(cmd.InheritedFlags())
-	if err != nil {
-		return err
-	}
-
+func deleteCanaryConfig(cmd *cobra.Command, options *deleteOptions, args []string) error {
 	id, err := util.ReadArgsOrStdin(args)
 	if err != nil {
 		return err
 	}
 
-	resp, err := gateClient.V2CanaryConfigControllerApi.DeleteCanaryConfigUsingDELETE(
-		gateClient.Context, id, map[string]interface{}{})
-
+	resp, err := options.GateClient.V2CanaryConfigControllerApi.DeleteCanaryConfigUsingDELETE(
+		options.GateClient.Context, id, &gate.V2CanaryConfigControllerApiDeleteCanaryConfigUsingDELETEOpts{})
 	if err != nil {
 		return err
 	}
@@ -68,7 +67,6 @@ func deleteCanaryConfig(cmd *cobra.Command, args []string) error {
 			"Encountered an error deleting canary config, status code: %d\n", resp.StatusCode)
 	}
 
-	util.UI.Info(
-		util.Colorize().Color(fmt.Sprintf("[reset][bold][green]Canary config %s deleted", id)))
+	options.Ui.Success(fmt.Sprintf("Canary config %s deleted", id))
 	return nil
 }

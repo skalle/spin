@@ -15,28 +15,28 @@ Method | HTTP request | Description
 
 
 # **CreateUsingPOST1**
-> CreateUsingPOST1(ctx, pipelineTemplate, optional)
+> map[string]interface{} CreateUsingPOST1(ctx, pipelineTemplate, optional)
 (ALPHA) Create a pipeline template.
 
 ### Required Parameters
 
 Name | Type | Description  | Notes
 ------------- | ------------- | ------------- | -------------
- **ctx** | **context.Context** | context for logging, tracing, authentication, etc.
+ **ctx** | **context.Context** | context for authentication, logging, cancellation, deadlines, tracing, etc.
   **pipelineTemplate** | [**interface{}**](interface{}.md)| pipelineTemplate | 
- **optional** | **map[string]interface{}** | optional parameters | nil if no parameters
+ **optional** | ***V2PipelineTemplatesControllerApiCreateUsingPOST1Opts** | optional parameters | nil if no parameters
 
 ### Optional Parameters
-Optional parameters are passed through a map[string]interface{}.
+Optional parameters are passed through a pointer to a V2PipelineTemplatesControllerApiCreateUsingPOST1Opts struct
 
 Name | Type | Description  | Notes
 ------------- | ------------- | ------------- | -------------
- **pipelineTemplate** | [**interface{}**](interface{}.md)| pipelineTemplate | 
- **tag** | **string**| tag | 
+
+ **tag** | **optional.String**| tag | 
 
 ### Return type
 
- (empty response body)
+[**map[string]interface{}**](interface{}.md)
 
 ### Authorization
 
@@ -57,19 +57,19 @@ Delete a pipeline template.
 
 Name | Type | Description  | Notes
 ------------- | ------------- | ------------- | -------------
- **ctx** | **context.Context** | context for logging, tracing, authentication, etc.
+ **ctx** | **context.Context** | context for authentication, logging, cancellation, deadlines, tracing, etc.
   **id** | **string**| id | 
- **optional** | **map[string]interface{}** | optional parameters | nil if no parameters
+ **optional** | ***V2PipelineTemplatesControllerApiDeleteUsingDELETE1Opts** | optional parameters | nil if no parameters
 
 ### Optional Parameters
-Optional parameters are passed through a map[string]interface{}.
+Optional parameters are passed through a pointer to a V2PipelineTemplatesControllerApiDeleteUsingDELETE1Opts struct
 
 Name | Type | Description  | Notes
 ------------- | ------------- | ------------- | -------------
- **id** | **string**| id | 
- **application** | **string**| application | 
- **digest** | **string**| digest | 
- **tag** | **string**| tag | 
+
+ **application** | **optional.String**| application | 
+ **digest** | **optional.String**| digest | 
+ **tag** | **optional.String**| tag | 
 
 ### Return type
 
@@ -94,18 +94,18 @@ No authorization required
 
 Name | Type | Description  | Notes
 ------------- | ------------- | ------------- | -------------
- **ctx** | **context.Context** | context for logging, tracing, authentication, etc.
+ **ctx** | **context.Context** | context for authentication, logging, cancellation, deadlines, tracing, etc.
   **id** | **string**| id | 
- **optional** | **map[string]interface{}** | optional parameters | nil if no parameters
+ **optional** | ***V2PipelineTemplatesControllerApiGetUsingGET2Opts** | optional parameters | nil if no parameters
 
 ### Optional Parameters
-Optional parameters are passed through a map[string]interface{}.
+Optional parameters are passed through a pointer to a V2PipelineTemplatesControllerApiGetUsingGET2Opts struct
 
 Name | Type | Description  | Notes
 ------------- | ------------- | ------------- | -------------
- **id** | **string**| id | 
- **digest** | **string**| digest | 
- **tag** | **string**| tag | 
+
+ **digest** | **optional.String**| digest | 
+ **tag** | **optional.String**| tag | 
 
 ### Return type
 
@@ -130,7 +130,7 @@ No authorization required
 
 Name | Type | Description  | Notes
 ------------- | ------------- | ------------- | -------------
- **ctx** | **context.Context** | context for logging, tracing, authentication, etc.
+ **ctx** | **context.Context** | context for authentication, logging, cancellation, deadlines, tracing, etc.
   **id** | **string**| id | 
 
 ### Return type
@@ -156,15 +156,15 @@ No authorization required
 
 Name | Type | Description  | Notes
 ------------- | ------------- | ------------- | -------------
- **ctx** | **context.Context** | context for logging, tracing, authentication, etc.
- **optional** | **map[string]interface{}** | optional parameters | nil if no parameters
+ **ctx** | **context.Context** | context for authentication, logging, cancellation, deadlines, tracing, etc.
+ **optional** | ***V2PipelineTemplatesControllerApiListUsingGET1Opts** | optional parameters | nil if no parameters
 
 ### Optional Parameters
-Optional parameters are passed through a map[string]interface{}.
+Optional parameters are passed through a pointer to a V2PipelineTemplatesControllerApiListUsingGET1Opts struct
 
 Name | Type | Description  | Notes
 ------------- | ------------- | ------------- | -------------
- **scopes** | [**[]string**](string.md)| scopes | 
+ **scopes** | [**optional.Interface of []string**](string.md)| scopes | 
 
 ### Return type
 
@@ -189,15 +189,15 @@ List pipeline templates with versions
 
 Name | Type | Description  | Notes
 ------------- | ------------- | ------------- | -------------
- **ctx** | **context.Context** | context for logging, tracing, authentication, etc.
- **optional** | **map[string]interface{}** | optional parameters | nil if no parameters
+ **ctx** | **context.Context** | context for authentication, logging, cancellation, deadlines, tracing, etc.
+ **optional** | ***V2PipelineTemplatesControllerApiListVersionsUsingGETOpts** | optional parameters | nil if no parameters
 
 ### Optional Parameters
-Optional parameters are passed through a map[string]interface{}.
+Optional parameters are passed through a pointer to a V2PipelineTemplatesControllerApiListVersionsUsingGETOpts struct
 
 Name | Type | Description  | Notes
 ------------- | ------------- | ------------- | -------------
- **scopes** | [**[]string**](string.md)| scopes | 
+ **scopes** | [**optional.Interface of []string**](string.md)| scopes | 
 
 ### Return type
 
@@ -222,7 +222,7 @@ No authorization required
 
 Name | Type | Description  | Notes
 ------------- | ------------- | ------------- | -------------
- **ctx** | **context.Context** | context for logging, tracing, authentication, etc.
+ **ctx** | **context.Context** | context for authentication, logging, cancellation, deadlines, tracing, etc.
   **pipeline** | [**interface{}**](interface{}.md)| pipeline | 
 
 ### Return type
@@ -241,31 +241,31 @@ No authorization required
 [[Back to top]](#) [[Back to API list]](../README.md#documentation-for-api-endpoints) [[Back to Model list]](../README.md#documentation-for-models) [[Back to README]](../README.md)
 
 # **UpdateUsingPOST1**
-> UpdateUsingPOST1(ctx, id, pipelineTemplate, optional)
+> map[string]interface{} UpdateUsingPOST1(ctx, id, pipelineTemplate, optional)
 (ALPHA) Update a pipeline template.
 
 ### Required Parameters
 
 Name | Type | Description  | Notes
 ------------- | ------------- | ------------- | -------------
- **ctx** | **context.Context** | context for logging, tracing, authentication, etc.
+ **ctx** | **context.Context** | context for authentication, logging, cancellation, deadlines, tracing, etc.
   **id** | **string**| id | 
   **pipelineTemplate** | [**interface{}**](interface{}.md)| pipelineTemplate | 
- **optional** | **map[string]interface{}** | optional parameters | nil if no parameters
+ **optional** | ***V2PipelineTemplatesControllerApiUpdateUsingPOST1Opts** | optional parameters | nil if no parameters
 
 ### Optional Parameters
-Optional parameters are passed through a map[string]interface{}.
+Optional parameters are passed through a pointer to a V2PipelineTemplatesControllerApiUpdateUsingPOST1Opts struct
 
 Name | Type | Description  | Notes
 ------------- | ------------- | ------------- | -------------
- **id** | **string**| id | 
- **pipelineTemplate** | [**interface{}**](interface{}.md)| pipelineTemplate | 
- **skipPlanDependents** | **bool**| skipPlanDependents | [default to false]
- **tag** | **string**| tag | 
+
+
+ **skipPlanDependents** | **optional.Bool**| skipPlanDependents | [default to false]
+ **tag** | **optional.String**| tag | 
 
 ### Return type
 
- (empty response body)
+[**map[string]interface{}**](interface{}.md)
 
 ### Authorization
 

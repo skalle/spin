@@ -1,4 +1,4 @@
-// Copyright (c) 2019, Kevin Reynolds.
+// Copyright (c) 2020, Anosua Chini Mukhopadhyay
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -16,36 +16,34 @@ package project
 
 import (
 	"fmt"
-	"github.com/spinnaker/spin/util"
 	"net/http"
 
+	"github.com/spinnaker/spin/util"
+
 	"github.com/spf13/cobra"
-	"github.com/spinnaker/spin/cmd/gateclient"
 )
 
-type GetOptions struct {
+type getProjectOptions struct {
 	*projectOptions
-	expand bool
 }
 
-var (
-	getProjectShort   = "Get the pipelines for the specified project"
-	getProjectLong    = "Get the pipelines for the specified project"
-	getProjectExample = "usage: spin project get-pipelines [options] project-name"
+const (
+	getProjectShort   = "Get the config for the specified project"
+	getProjectLong    = "Get the config for the specified project"
+	getProjectExample = "usage: spin project [options] project-name"
 )
 
-func NewGetCmd(prjOptions projectOptions) *cobra.Command {
-	options := GetOptions{
-		projectOptions: &prjOptions,
-		expand: false,
+func NewGetCmd(prjOptions *projectOptions) *cobra.Command {
+	options := &getProjectOptions{
+		projectOptions: prjOptions,
 	}
 
 	cmd := &cobra.Command{
-		Use:     "get-pipelines",
+		Use:     "get",
 		Short:   getProjectShort,
 		Long:    getProjectLong,
 		Example: getProjectExample,
-		RunE:    func(cmd *cobra.Command, args []string) error {
+		RunE: func(cmd *cobra.Command, args []string) error {
 			return getProject(cmd, options, args)
 		},
 	}
@@ -53,21 +51,16 @@ func NewGetCmd(prjOptions projectOptions) *cobra.Command {
 	return cmd
 }
 
-func getProject(cmd *cobra.Command, options GetOptions, args []string) error {
-	gateClient, err := gateclient.NewGateClient(cmd.InheritedFlags())
-	if err != nil {
-		return err
-	}
-
+func getProject(cmd *cobra.Command, options *getProjectOptions, args []string) error {
 	projectName, err := util.ReadArgsOrStdin(args)
 	if err != nil {
 		return err
 	}
 
-	project, resp, err := gateClient.ProjectControllerApi.AllPipelinesForProjectUsingGET(gateClient.Context, projectName, map[string]interface{}{"expand": options.expand})
+	project, resp, err := options.GateClient.ProjectControllerApi.GetUsingGET1(options.GateClient.Context, projectName)
 	if resp != nil {
 		if resp.StatusCode == http.StatusNotFound {
-			return fmt.Errorf("Project '%s' not found\n",projectName)
+			return fmt.Errorf("Project '%s' not found\n", projectName)
 		} else if resp.StatusCode != http.StatusOK {
 			return fmt.Errorf("Encountered an error getting project, status code: %d\n", resp.StatusCode)
 		}
@@ -76,7 +69,7 @@ func getProject(cmd *cobra.Command, options GetOptions, args []string) error {
 	if err != nil {
 		return err
 	}
-	util.UI.JsonOutput(project, util.UI.OutputFormat)
+	options.Ui.JsonOutput(project)
 
 	return nil
 }

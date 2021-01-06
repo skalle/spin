@@ -17,11 +17,12 @@ package application
 import (
 	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
-	"os"
 	"testing"
 
+	"github.com/spinnaker/spin/cmd"
 	"github.com/spinnaker/spin/util"
 )
 
@@ -29,11 +30,8 @@ func TestApplicationDelete_basic(t *testing.T) {
 	ts := testGateApplicationDeleteSuccess()
 	defer ts.Close()
 
-	currentCmd := NewDeleteCmd(applicationOptions{})
-	rootCmd := getRootCmdForTest()
-	appCmd := NewApplicationCmd(os.Stdout)
-	appCmd.AddCommand(currentCmd)
-	rootCmd.AddCommand(appCmd)
+	rootCmd, options := cmd.NewCmdRoot(ioutil.Discard, ioutil.Discard)
+	rootCmd.AddCommand(NewApplicationCmd(options))
 
 	args := []string{"application", "delete", NAME, "--gate-endpoint=" + ts.URL}
 	rootCmd.SetArgs(args)
@@ -47,11 +45,8 @@ func TestApplicationDelete_fail(t *testing.T) {
 	ts := GateAppDeleteFail()
 	defer ts.Close()
 
-	currentCmd := NewDeleteCmd(applicationOptions{})
-	rootCmd := getRootCmdForTest()
-	appCmd := NewApplicationCmd(os.Stdout)
-	appCmd.AddCommand(currentCmd)
-	rootCmd.AddCommand(appCmd)
+	rootCmd, options := cmd.NewCmdRoot(ioutil.Discard, ioutil.Discard)
+	rootCmd.AddCommand(NewApplicationCmd(options))
 
 	args := []string{"application", "delete", NAME, "--gate-endpoint=" + ts.URL}
 	rootCmd.SetArgs(args)
@@ -65,11 +60,8 @@ func TestApplicationDelete_flags(t *testing.T) {
 	ts := testGateApplicationDeleteSuccess()
 	defer ts.Close()
 
-	currentCmd := NewDeleteCmd(applicationOptions{})
-	rootCmd := getRootCmdForTest()
-	appCmd := NewApplicationCmd(os.Stdout)
-	appCmd.AddCommand(currentCmd)
-	rootCmd.AddCommand(appCmd)
+	rootCmd, options := cmd.NewCmdRoot(ioutil.Discard, ioutil.Discard)
+	rootCmd.AddCommand(NewApplicationCmd(options))
 
 	args := []string{"application", "delete", NAME, "--gate-endpoint=" + ts.URL}
 	rootCmd.SetArgs(args)
@@ -86,6 +78,7 @@ func testGateApplicationDeleteSuccess() *httptest.Server {
 	mux.Handle("/applications/"+APP, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		payload := map[string]string{} // We don't use the payload, we are just checking if the target app exists.
 		b, _ := json.Marshal(&payload)
+		w.Header().Add("content-type", "application/json")
 		fmt.Fprintln(w, string(b))
 	}))
 	mux.Handle("/tasks", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -93,6 +86,7 @@ func testGateApplicationDeleteSuccess() *httptest.Server {
 			"ref": "/tasks/id",
 		}
 		b, _ := json.Marshal(&payload)
+		w.Header().Add("content-type", "application/json")
 		fmt.Fprintln(w, string(b))
 	}))
 	mux.Handle("/tasks/id", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -100,6 +94,7 @@ func testGateApplicationDeleteSuccess() *httptest.Server {
 			"status": "SUCCEEDED",
 		}
 		b, _ := json.Marshal(&payload)
+		w.Header().Add("content-type", "application/json")
 		fmt.Fprintln(w, string(b))
 	}))
 	return httptest.NewServer(mux)

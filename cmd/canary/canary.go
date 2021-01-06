@@ -2,11 +2,13 @@ package canary
 
 import (
 	"github.com/spf13/cobra"
-	canary_config "github.com/spinnaker/spin/cmd/canary/canary-config"
-	"io"
+
+	"github.com/spinnaker/spin/cmd"
 )
 
-type canaryOptions struct{}
+type CanaryOptions struct {
+	*cmd.RootOptions
+}
 
 const (
 	canaryShort   = ""
@@ -14,7 +16,10 @@ const (
 	canaryExample = ""
 )
 
-func NewCanaryCmd(out io.Writer) *cobra.Command {
+func NewCanaryCmd(rootOptions *cmd.RootOptions) (*cobra.Command, *CanaryOptions) {
+	options := &CanaryOptions{
+		RootOptions: rootOptions,
+	}
 	cmd := &cobra.Command{
 		Use:     "canary",
 		Aliases: []string{},
@@ -22,8 +27,5 @@ func NewCanaryCmd(out io.Writer) *cobra.Command {
 		Long:    canaryLong,
 		Example: canaryExample,
 	}
-
-	// create subcommands
-	cmd.AddCommand(canary_config.NewCanaryConfigCmd(out))
-	return cmd
+	return cmd, options
 }
